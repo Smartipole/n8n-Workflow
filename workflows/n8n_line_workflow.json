@@ -1,0 +1,334 @@
+{
+  "name": "LINE Bot - Fixed Version",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-line",
+      "name": "Webhook LINE Bot",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "webhookId": "line-webhook-main"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.events[0].type}}",
+              "operation": "equals",
+              "value2": "message"
+            }
+          ]
+        }
+      },
+      "id": "if-message",
+      "name": "เช็ค Message Event",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.events[0].type}}",
+              "operation": "equals",
+              "value2": "follow"
+            }
+          ]
+        }
+      },
+      "id": "if-follow",
+      "name": "เช็ค Follow Event",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.item.json.events[0];\nconst userId = event.source.userId;\nconst messageText = event.message.text || '';\nconst replyToken = event.replyToken;\nconst timestamp = new Date().toLocaleString('th-TH', { \n  timeZone: 'Asia/Bangkok',\n  day: '2-digit',\n  month: '2-digit',\n  year: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  second: '2-digit'\n});\n\nconst requestId = 'REQ-' + Date.now();\n\nlet action = 'show_menu';\nif (messageText.includes('แจ้งซ่อม') || messageText.includes('ซ่อม')) {\n  action = 'repair';\n} else if (messageText.includes('เมนู')) {\n  action = 'show_menu';\n}\n\nreturn { \n  json: {\n    userId,\n    messageText,\n    replyToken,\n    timestamp,\n    requestId,\n    action\n  }\n};"
+      },
+      "id": "process-message",
+      "name": "ประมวลผลข้อความ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 200]
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "17iHlGJ2XOVhVGpv7aJuuAbITXqXp-d_4V3JBRgKNAz4",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "แจ้งเหตุไฟฟ้าขัดข้อง",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ประทับเวลา": "={{$json.timestamp}}",
+            "เลขรับแจ้ง": "={{$json.requestId}}",
+            "LINE User ID": "={{$json.userId}}",
+            "Line name": "={{$json.userId}}",
+            "สาเหตุ": "={{$json.messageText}}",
+            "สถานะ": "รอดำเนินการ",
+            "ยืนยัน": "ยืนยัน (จากระบบ)",
+            "Form Type": "CHAT"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-sheets",
+      "name": "บันทึกลง Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [850, 100],
+      "credentials": {
+        "googleApi": {
+          "id": "OZw8cze8OnNNXIEG",
+          "name": "Google Service Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "-4745179416",
+        "text": "=🔔 *แจ้งเตือนคำขอใหม่*\n\n📋 เลขที่: {{$json.requestId}}\n👤 ผู้แจ้ง: {{$json.userId}}\n📝 รายละเอียด: {{$json.messageText}}\n⏰ เวลา: {{$json.timestamp}}\n📊 สถานะ: รอดำเนินการ",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-notify",
+      "name": "แจ้งเตือน Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "nCuFhOsUCAQGI85F",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.item.json;\n\nconst flexMessage = {\n  type: \"flex\",\n  altText: `การแจ้งซ่อมเลขที่ ${data.requestId} สำเร็จ`,\n  contents: {\n    type: \"bubble\",\n    header: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"text\",\n          text: \"✅ แจ้งซ่อมสำเร็จ\",\n          weight: \"bold\",\n          size: \"lg\",\n          color: \"#ffffff\",\n          align: \"center\"\n        }\n      ],\n      backgroundColor: \"#10b981\",\n      paddingAll: \"20px\"\n    },\n    body: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"box\",\n          layout: \"horizontal\",\n          contents: [\n            {\n              type: \"text\",\n              text: \"📋 เลขที่:\",\n              size: \"sm\",\n              color: \"#64748b\",\n              flex: 2\n            },\n            {\n              type: \"text\",\n              text: data.requestId,\n              size: \"sm\",\n              color: \"#0f172a\",\n              weight: \"bold\",\n              flex: 3,\n              wrap: true\n            }\n          ]\n        },\n        {\n          type: \"box\",\n          layout: \"horizontal\",\n          contents: [\n            {\n              type: \"text\",\n              text: \"⏰ เวลา:\",\n              size: \"sm\",\n              color: \"#64748b\",\n              flex: 2\n            },\n            {\n              type: \"text\",\n              text: data.timestamp,\n              size: \"sm\",\n              color: \"#0f172a\",\n              flex: 3,\n              wrap: true\n            }\n          ],\n          margin: \"md\"\n        },\n        {\n          type: \"separator\",\n          margin: \"lg\"\n        },\n        {\n          type: \"text\",\n          text: \"เจ้าหน้าที่จะดำเนินการตรวจสอบและติดต่อกลับโดยเร็วที่สุด\",\n          size: \"xs\",\n          color: \"#64748b\",\n          wrap: true,\n          margin: \"lg\"\n        }\n      ],\n      paddingAll: \"20px\"\n    },\n    footer: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"button\",\n          style: \"link\",\n          action: {\n            type: \"message\",\n            label: \"📊 ติดตามสถานะ\",\n            text: \"ติดตามการซ่อม\"\n          }\n        }\n      ],\n      paddingAll: \"20px\",\n      backgroundColor: \"#f0fdf4\"\n    }\n  }\n};\n\nreturn { json: { ...data, flexMessage } };"
+      },
+      "id": "create-flex",
+      "name": "สร้าง Flex Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replyToken\": \"{{$json.replyToken}}\",\n  \"messages\": [{{$json.flexMessage}}]\n}",
+        "options": {}
+      },
+      "id": "line-reply",
+      "name": "ส่ง Flex Message กลับ LINE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LINE_CREDENTIALS_ID",
+          "name": "LINE Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const event = $input.item.json.events[0];\nconst userId = event.source.userId;\nconst replyToken = event.replyToken;\n\nconst flexMessage = {\n  type: \"flex\",\n  altText: \"ยินดีต้อนรับสู่ระบบแจ้งซ่อมไฟฟ้า\",\n  contents: {\n    type: \"bubble\",\n    header: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"text\",\n          text: \"⚡ ยินดีต้อนรับ\",\n          weight: \"bold\",\n          size: \"xl\",\n          color: \"#ffffff\",\n          align: \"center\"\n        }\n      ],\n      backgroundColor: \"#f59e0b\",\n      paddingAll: \"20px\"\n    },\n    body: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"text\",\n          text: \"💡\",\n          size: \"5xl\",\n          align: \"center\"\n        },\n        {\n          type: \"text\",\n          text: \"ขอบคุณที่ติดตามระบบของเรา คุณสามารถแจ้งซ่อมไฟฟ้าสาธารณะได้ทันที\",\n          size: \"sm\",\n          color: \"#475569\",\n          wrap: true,\n          margin: \"lg\"\n        }\n      ],\n      paddingAll: \"20px\"\n    },\n    footer: {\n      type: \"box\",\n      layout: \"vertical\",\n      contents: [\n        {\n          type: \"button\",\n          style: \"primary\",\n          action: {\n            type: \"message\",\n            label: \"🔧 เริ่มใช้งาน\",\n            text: \"เมนู\"\n          },\n          color: \"#f59e0b\"\n        }\n      ],\n      paddingAll: \"20px\"\n    }\n  }\n};\n\nreturn { json: { userId, replyToken, flexMessage } };"
+      },
+      "id": "welcome-flex",
+      "name": "สร้าง Welcome Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replyToken\": \"{{$json.replyToken}}\",\n  \"messages\": [{{$json.flexMessage}}]\n}",
+        "options": {}
+      },
+      "id": "line-welcome",
+      "name": "ส่ง Welcome Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "LINE_CREDENTIALS_ID",
+          "name": "LINE Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"status\": \"success\"}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "webhook-response",
+      "name": "Response กลับ LINE",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1450, 350]
+    }
+  ],
+  "connections": {
+    "Webhook LINE Bot": {
+      "main": [
+        [
+          {
+            "node": "เช็ค Message Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "เช็ค Follow Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "เช็ค Message Event": {
+      "main": [
+        [
+          {
+            "node": "ประมวลผลข้อความ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "เช็ค Follow Event": {
+      "main": [
+        [
+          {
+            "node": "สร้าง Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ประมวลผลข้อความ": {
+      "main": [
+        [
+          {
+            "node": "บันทึกลง Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "แจ้งเตือน Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "บันทึกลง Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "สร้าง Flex Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "แจ้งเตือน Telegram": {
+      "main": [
+        [
+          {
+            "node": "Response กลับ LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "สร้าง Flex Message": {
+      "main": [
+        [
+          {
+            "node": "ส่ง Flex Message กลับ LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ส่ง Flex Message กลับ LINE": {
+      "main": [
+        [
+          {
+            "node": "Response กลับ LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "สร้าง Welcome Message": {
+      "main": [
+        [
+          {
+            "node": "ส่ง Welcome Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ส่ง Welcome Message": {
+      "main": [
+        [
+          {
+            "node": "Response กลับ LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "tags": []
+}
